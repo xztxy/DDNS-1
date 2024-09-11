@@ -8,14 +8,15 @@ https://packaging.python.org/guides/distributing-packages-using-setuptools/
 https://github.com/pypa/sampleproject
 """
 
-# Always prefer setuptools over distutils
-from setuptools import setup, find_packages
+from time import time
 from os import path, environ
 # io.open is needed for projects that support Python 2.7
 # It ensures open() defaults to text mode with universal newlines,
 # and accepts an argument to specify the text encoding
 # Python 3 only projects can skip this import
 from io import open
+# Always prefer setuptools over distutils
+from setuptools import setup, find_packages
 from run import __description__
 
 here = path.abspath(path.dirname(__file__))
@@ -34,6 +35,14 @@ if 'TRAVIS_TAG' in environ:
     version = environ['TRAVIS_TAG']  # `TRAVIS_TAG` from Travis
 elif 'BUILD_SOURCEBRANCHNAME' in environ:
     version = environ['BUILD_SOURCEBRANCHNAME']  # from azure pipelines
+elif 'GITHUB_REF_NAME' in environ:  # github actions
+    ref = environ['GITHUB_REF_NAME']
+    if ref == 'master' or ref == 'main':  # CI
+        version = '0.0.b' + str(int(time()))
+    elif ref.startswith('v') or ref.startswith('V'):  # Tag
+        version = ref
+    else:  # PR
+        version = '0.0.a1'
 else:
     raise Exception("setup.py should be run in CI (Travis or AzurePipelines)")
 version = version.strip('v').strip('V')
@@ -113,7 +122,7 @@ setup(
         #   3 - Alpha
         #   4 - Beta
         #   5 - Production/Stable
-        'Development Status :: 4 - Beta',
+        'Development Status :: 5 - Production/Stable',
 
         # Indicate who your project is intended for
         'Intended Audience :: Developers',
@@ -126,13 +135,8 @@ setup(
         # that you indicate whether you support Python 2, Python 3 or both.
         # These classifiers are *not* checked by 'pip install'. See instead
         # 'python_requires' below.
-        'Programming Language :: Python :: 2',
-        'Programming Language :: Python :: 2.7',
+        # 'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.4',
-        'Programming Language :: Python :: 3.5',
-        'Programming Language :: Python :: 3.6',
-        'Programming Language :: Python :: 3.7',
     ],
 
     # This field adds keywords for your project which will appear on the

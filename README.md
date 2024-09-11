@@ -4,22 +4,8 @@
 > 代理模式,支持自动创建域名记录。
 
 [![PyPI](https://img.shields.io/pypi/v/ddns.svg?label=DDNS&style=social)](https://pypi.org/project/ddns/)
-[![Build Status](https://travis-ci.com/NewFuture/DDNS.svg?branch=master)](https://travis-ci.com/NewFuture/DDNS)
-[![Build Status](https://dev.azure.com/NewFuture-CI/ddns-ci/_apis/build/status/NewFuture.DDNS?branchName=master)](https://dev.azure.com/NewFuture-CI/ddns-ci/_build/latest?definitionId=2&branchName=master)
-[![latest deploy](https://vsrm.dev.azure.com/NewFuture-CI/_apis/public/Release/badge/2ab09aad-c4b4-4c57-ab1b-2fb92c485664/1/1)](https://github.com/NewFuture/DDNS/releases/latest)
-
-<details>
-
-<summary markdown="span">Build Details
-</summary>
-
-- Linux Python (2 和 3): [![Travis build](https://img.shields.io/travis/com/NewFuture/DDNS/master.svg?label=python2%2Cpython3&logo=ubuntu&logoColor=white)](https://travis-ci.com/NewFuture/DDNS)
-- Windows Python3.7: [![Build Status](https://dev.azure.com/NewFuture-CI/ddns-ci/_apis/build/status/NewFuture.DDNS?branchName=master&jobName=Windows&configuration=Windows%20Python37)](https://dev.azure.com/NewFuture-CI/ddns-ci/_build/latest?definitionId=2&branchName=master)
-- Windows Python2.7: [![Build Status](https://dev.azure.com/NewFuture-CI/ddns-ci/_apis/build/status/NewFuture.DDNS?branchName=master&jobName=Windows&configuration=Windows%20Python27)](https://dev.azure.com/NewFuture-CI/ddns-ci/_build/latest?definitionId=2&branchName=master)
-- Mac OSX Python3.7: [![Build Status](https://dev.azure.com/NewFuture-CI/ddns-ci/_apis/build/status/NewFuture.DDNS?branchName=master&jobName=MacOS&configuration=MacOS%20Python37)](https://dev.azure.com/NewFuture-CI/ddns-ci/_build/latest?definitionId=2&branchName=master)
-- Mac OSX Python2.7: [![Build Status](https://dev.azure.com/NewFuture-CI/ddns-ci/_apis/build/status/NewFuture.DDNS?branchName=master&jobName=MacOS&configuration=MacOS%20Python27)](https://dev.azure.com/NewFuture-CI/ddns-ci/_build/latest?definitionId=2&branchName=master)
-
-</details>
+[![Build Status](https://github.com/NewFuture/DDNS/actions/workflows/build.yml/badge.svg?event=push)](https://github.com/NewFuture/DDNS/actions/workflows/build.yml)
+[![Publish Status](https://github.com/NewFuture/DDNS/actions/workflows/publish.yml/badge.svg)](https://github.com/NewFuture/DDNS/releases/latest)
 
 ---
 
@@ -28,7 +14,7 @@
 - 兼容和跨平台:
   - [x] 可执行文件(无需 python 环境)
   - [x] 多系统兼容 ![cross platform](https://img.shields.io/badge/platform-windows_%7C%20linux_%7C%20osx-success.svg?style=social)
-  - [x] python2 和 python3 支持 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/ddns.svg?style=social)
+  - [x] python3 支持 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/ddns.svg?style=social)(2.x支持python2和python3)
   - [x] PIP 安装 ![PyPI - Wheel](https://img.shields.io/pypi/wheel/ddns.svg?style=social)
   - [x] Docker 支持(@NN708)
 - 域名支持:
@@ -135,7 +121,7 @@ python run.py -c /path/to/config.json
 
 |  key   |        type        | required |   default   |    description    | tips                                                                                                        |
 | :----: | :----------------: | :------: | :---------: | :---------------: | ----------------------------------------------------------------------------------------------------------- |
-|   id   |       string       |    √     |     无      |    api 访问 ID    | Cloudflare 为邮箱(使用 Token 时留空)<br>HE.net 可留空                                                       |
+|   id   |       string       |    √     |     无      |    api 访问 ID    | Cloudflare 为邮箱(使用 Token 时留空)<br>HE.net 可留空<br>华为云为 Access Key ID (AK)                                                       |
 | token  |       string       |    √     |     无      |  api 授权 token   | 部分平台叫 secret key , **反馈粘贴时删除**                                                                  |
 |  dns   |       string       |    No    | `"dnspod"`  |    dns 服务商     | 阿里 DNS 为`alidns`,<br>Cloudflare 为 `cloudflare`,<br>dns.com 为 `dnscom`,<br>DNSPOD 国内为 `dnspod`,<br>DNSPOD 国际版为 `dnspod_com`,<br>HE.net 为`he`,<br>华为 DNS 为`huaweidns`,<br>自定义回调为`callback` |
 |  ipv4  |       array        |    No    |    `[]`     |   ipv4 域名列表   | 为`[]`时,不会获取和更新 IPv4 地址                                                                           |
@@ -145,14 +131,13 @@ python run.py -c /path/to/config.json
 |  ttl   |       number       |    No    |   `null`    | DNS 解析 TTL 时间 | 不设置采用 DNS 默认策略                                                                                     |
 | proxy  |       string       |    No    |     无      | http 代理`;`分割  | 多代理逐个尝试直到成功,`DIRECT`为直连                                                                       |
 | debug  |        bool        |    No    |   `false`   |   是否开启调试    | 运行异常时,打开调试输出,方便诊断错误                                                                        |
-| cache  |        bool        |    No    |   `true`    |   是否缓存记录    | 正常情况打开避免频繁更新                                                                                    |
+| cache  |    string\|bool    |    No    |   `true`    |   是否缓存记录    | 正常情况打开避免频繁更新,默认位置为临时目录下`ddns.cache`,<br>也可以指定一个具体文件实现自定义文件缓存位置         |
 
 #### index4 和 index6 参数说明
 
 - 数字(`0`,`1`,`2`,`3`等): 第 i 个网卡 ip
 - 字符串`"default"`(或者无此项): 系统访问外网默认 IP
 - 字符串`"public"`: 使用公网 ip(使用公网 API 查询,url 的简化模式)
-- 字符串`"interface"`: 使用指定网卡 ip(如:`"interface:eno1"`)
 - 字符串`"url:xxx"`: 打开 URL `xxx`(如:`"url:http://ip.sb"`),从返回的数据提取 IP 地址
 - 字符串`"regex:xxx"` 正则表达(如`"regex:192.*"`): 提取`ifconfig`/`ipconfig`中与之匹配的首个 IP 地址,**注意 json 转义**(`\`要写成`\\`)
   - `"192.*"`表示 192 开头的所有 ip

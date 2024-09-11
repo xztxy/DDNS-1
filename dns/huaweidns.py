@@ -6,26 +6,22 @@ https://support.huaweicloud.com/api-dns/zh-cn_topic_0037134406.html
 @author: cybmp3
 """
 
-import hashlib
-import hmac
-import binascii
-import json
-from uuid import uuid4
-from base64 import b64encode
 
-#from json import loads as jsondecode
-
+from hashlib import sha256
+from hmac import new as hmac
+from binascii import hexlify
+from json import loads as jsondecode, dumps as jsonencode
 from logging import debug, info, warning
 from datetime import datetime
 
 try:
     # python 2
     from httplib import HTTPSConnection
-    from urllib import urlencode, quote_plus, quote
+    from urllib import urlencode
 except ImportError:
     # python 3
     from http.client import HTTPSConnection
-    from urllib.parse import urlencode, quote_plus, quote
+    from urllib.parse import urlencode
 
 __author__ = 'New Future'
 BasicDateFormat = "%Y%m%dT%H%M%SZ"
@@ -49,9 +45,9 @@ class API:
 
 
 def HexEncodeSHA256Hash(data):
-    sha256 = hashlib.sha256()
-    sha256.update(data)
-    return sha256.hexdigest()
+    sha = sha256()
+    sha.update(data)
+    return sha.hexdigest()
 
 
 def StringToSign(canonical_request, t):
@@ -80,7 +76,8 @@ def request(method, path, param=None, body=None, **params):
 
     query = urlencode(sorted(params.items()))
     headers = {"content-type": "application/json"}  # 初始化header
-    headers["X-Sdk-Date"] = datetime.strftime(datetime.utcnow(), BasicDateFormat)
+    headers["X-Sdk-Date"] = datetime.strftime(
+        datetime.utcnow(), BasicDateFormat)
     headers["host"] = API.SITE
     # 如何后来有需要把header头 key转换为小写 value 删除前导空格和尾随空格
     sign_headers = []
@@ -105,15 +102,18 @@ def request(method, path, param=None, body=None, **params):
     canonical_request = "%s\n%s\n%s\n%s\n%s\n%s" % (method.upper(), sign_path, query,
                                                     canonical_headers, ";".join(sign_headers), hex_encode)
 
-    hashed_canonical_request = HexEncodeSHA256Hash(canonical_request.encode('utf-8'))
+    hashed_canonical_request = HexEncodeSHA256Hash(
+        canonical_request.encode('utf-8'))
 
     # StringToSign
-    str_to_sign = "%s\n%s\n%s" % (Algorithm, headers['X-Sdk-Date'], hashed_canonical_request)
+    str_to_sign = "%s\n%s\n%s" % (
+        Algorithm, headers['X-Sdk-Date'], hashed_canonical_request)
 
     secret = Config.TOKEN
     # 计算签名  HexEncode(HMAC(Access Secret Key, string to sign))
-    signature = hmac.new(secret.encode('utf-8'), str_to_sign.encode('utf-8'), digestmod=hashlib.sha256).digest()
-    signature = binascii.hexlify(signature).decode()
+    signature = hmac(secret.encode(
+        'utf-8'), str_to_sign.encode('utf-8'), digestmod=sha256).digest()
+    signature = hexlify(signature).decode()
     # 添加签名信息到请求头
     auth_header = "%s Access=%s, SignedHeaders=%s, Signature=%s" % (
         Algorithm, Config.ID, ";".join(sign_headers), signature)
@@ -125,7 +125,8 @@ def request(method, path, param=None, body=None, **params):
         conn.set_tunnel(API.SITE, 443)
     else:
         conn = HTTPSConnection(API.SITE)
-    conn.request(method, API.SCHEME + "://" + API.SITE + path + '?' + query, body, headers)
+    conn.request(method, API.SCHEME + "://" + API.SITE +
+                 path + '?' + query, body, headers)
     info(API.SCHEME + "://" + API.SITE + path + '?' + query, body)
     resp = conn.getresponse()
     data = resp.read().decode('utf8')
@@ -135,35 +136,43 @@ def request(method, path, param=None, body=None, **params):
         warning('%s : error[%d]: %s', path, resp.status, data)
         raise Exception(data)
     else:
-        data = json.loads(data)
+        data = jsondecode(data)
         debug('%s : result:%s', path, data)
         return data
 
 
 def get_zone_id(domain):
     """
-    切割域名获取主域名和对应ID https://support.huaweicloud.com/api-dns/zh-cn_topic_0037134402.html
+    切割域名获取主域名和对应ID https://support.huaweicloud.com/api-dns/dns_api_62003.html
+    优先匹配级数最长的主域名
     """
-    zones = request('GET', '/v2/zones', limit=500)['zones']
-    domain += '.'
-    zone = next((z for z in zones if domain.endswith(z.get('name'))), None)
-    zoneid = zone and zone['id']
+    zoneid = None
+    domain_slice = domain.split('.')
+    index = len(domain_slice)
+    root_domain = '.'.join(domain_slice[-2:])
+    zones = request('GET', '/v2/zones', limit=500, name=root_domain)['zones']
+    while (not zoneid) and (index >= 2):
+        domain = '.'.join(domain_slice[-index:]) + '.'
+        zone = next((z for z in zones if domain == (z.get('name'))), None)
+        zoneid = zone and zone['id']
+        index -= 1
     return zoneid
+
 
 def get_records(zoneid, **conditions):
     """
         获取记录ID
         返回满足条件的所有记录[]
-        https://support.huaweicloud.com/api-dns/zh-cn_topic_0037129970.html
+        https://support.huaweicloud.com/api-dns/dns_api_64004.html
         TODO 大于500翻页
     """
     cache_key = zoneid + "_" + \
-                conditions.get('name', "") + "_" + conditions.get('type', "")
+        conditions.get('name', "") + "_" + conditions.get('type', "")
     if not hasattr(get_records, 'records'):
         get_records.records = {}  # "静态变量"存储已查询过的id
         get_records.keys = ('id', 'type', 'name', 'records', 'ttl')
 
-    if not zoneid in get_records.records:
+    if zoneid not in get_records.records:
         get_records.records[cache_key] = {}
 
         data = request('GET', '/v2/zones/' + zoneid + '/recordsets',
@@ -185,13 +194,13 @@ def get_records(zoneid, **conditions):
     return records
 
 
-def update_record(domain, value, record_type='A', name=None):
+def update_record(domain, value, record_type='A'):
     """
         更新记录
         update
-        https://support.huaweicloud.com/api-dns/dns_api_64006.html
+        https://support.huaweicloud.com/api-dns/UpdateRecordSet.html
         add
-        https://support.huaweicloud.com/api-dns/zh-cn_topic_0037134404.html
+        https://support.huaweicloud.com/api-dns/dns_api_64001.html
     """
     info(">>>>>%s(%s)", domain, record_type)
     zoneid = get_zone_id(domain)
@@ -205,22 +214,29 @@ def update_record(domain, value, record_type='A', name=None):
         for (rid, record) in records.items():
             if record['records'] != value:
                 """
+                PUT https://{endpoint}/v2/zones/{zone_id}/recordsets/{recordset_id}
+
                 {
-                    "description": "This is an example record set.",
-                    "ttl": 3600,
-                    "records": [
-                        "192.168.10.1",
-                        "192.168.10.2"
-                    ]
+                    "name" : "www.example.com.",
+                    "description" : "This is an example record set.",
+                    "type" : "A",
+                    "ttl" : 3600,
+                    "records" : [ "192.168.10.1", "192.168.10.2" ]
                 }
                 """
                 body = {
-                    "records":[
+                    "name": domain,
+                    "description": "Managed by DDNS.",
+                    "type": record_type,
+                    "records": [
                         value
                     ]
                 }
+                # 如果TTL不为空，则添加到字典中
+                if Config.TTL is not None:
+                    body['ttl'] = Config.TTL
                 res = request('PUT', '/v2/zones/' + zoneid + '/recordsets/' + record['id'],
-                              body=str(json.dumps(body)))
+                              body=str(jsonencode(body)))
                 if res:
                     get_records.records[cache_key][rid]['records'] = value
                     result[rid] = res.get("name")
@@ -229,16 +245,19 @@ def update_record(domain, value, record_type='A', name=None):
             else:
                 result[rid] = domain
     else:  # create
-        print(domain)
         body = {
             "name": domain,
+            "description": "Managed by DDNS.",
             "type": record_type,
-            "records":[
+            "records": [
                 value
             ]
         }
+        # 如果TTL不为空，则添加到字典中
+        if Config.TTL is not None:
+            body['ttl'] = Config.TTL
         res = request('POST', '/v2/zones/' + zoneid + '/recordsets',
-                      body=str(json.dumps(body)))
+                      body=str(jsonencode(body)))
         if res:
             get_records.records[cache_key][res['id']] = res
             result = res
